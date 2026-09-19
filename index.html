@@ -101,6 +101,12 @@
                 <p class="text-[10px] text-gray-500 mt-2">Kunci disimpan aman secara lokal di browser Anda.</p>
             </div>
 
+            <label class="block text-sm font-medium text-gray-300 mb-2">Model AI</label>
+            <select id="aiModel" class="w-full bg-gray-800 border border-gray-700 rounded-lg p-3 text-sm text-white focus:ring-2 focus:ring-blue-500 outline-none mb-4">
+                <option value="gemini-3.1-flash-image">Gemini 3.1 Flash Image (Premium/Detail Tinggi)</option>
+                <option value="gemini-3.1-flash-lite-image">Gemini 3.1 Flash Lite (Lebih Ringan/Cepat)</option>
+            </select>
+
             <label class="block text-sm font-medium text-gray-300 mb-2">Deskripsi Landscape</label>
             <textarea id="promptInput" rows="4" class="w-full bg-gray-800 border border-gray-700 rounded-lg p-3 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all resize-none" placeholder="Contoh: Pegunungan alpen saat matahari terbit dengan danau jernih, hyper-realistic, pencahayaan dramatis..."></textarea>
             
@@ -382,6 +388,7 @@
             const prompt = document.getElementById('promptInput').value.trim();
             const aspectRatio = document.getElementById('aspectRatio').value;
             const apiKey = document.getElementById('apiKeyInput').value.trim();
+            const selectedModel = document.getElementById('aiModel').value;
             
             if (!apiKey) {
                 showMessage("Peringatan", "Mohon masukkan Gemini API Key Anda di panel sebelah kiri terlebih dahulu.");
@@ -396,20 +403,34 @@
             setGenerating(true);
 
             // Enhance prompt for stock photography
-            const enhancedPrompt = `Breathtaking nature landscape, highly detailed, masterclass photography, 8k resolution, suitable for stock photo. ${prompt}`;
+            const enhancedPrompt = `Breathtaking nature landscape, highly detailed, masterclass photography, 8k resolution, suitable for stock photo. Aspect ratio requested: ${aspectRatio}. ${prompt}`;
 
-            const payload = {
-                contents: [{
-                    role: 'user',
-                    parts: [{ text: enhancedPrompt }]
-                }],
-                generationConfig: {
-                    responseModalities: ['IMAGE'],
-                    imageConfig: { aspectRatio: aspectRatio }
-                },
-            };
+            let payload;
+            
+            // Konfigurasi payload berbeda tergantung model yang dipilih
+            if (selectedModel === 'gemini-3.1-flash-lite-image') {
+                payload = {
+                    contents: [{
+                        parts: [{ text: enhancedPrompt }]
+                    }],
+                    generationConfig: {
+                        responseModalities: ['TEXT', 'IMAGE']
+                    },
+                };
+            } else {
+                payload = {
+                    contents: [{
+                        role: 'user',
+                        parts: [{ text: enhancedPrompt }]
+                    }],
+                    generationConfig: {
+                        responseModalities: ['IMAGE'],
+                        imageConfig: { aspectRatio: aspectRatio }
+                    },
+                };
+            }
 
-            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image:generateContent?key=${apiKey}`;
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${selectedModel}:generateContent?key=${apiKey}`;
 
             try {
                 // Call Gemini for Image

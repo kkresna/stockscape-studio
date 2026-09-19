@@ -1,0 +1,759 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>StockScape Studio - Pro Nature Generator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #121212;
+            color: #e0e0e0;
+            overflow: hidden; /* Prevent body scroll, manage in flex layout */
+        }
+        
+        /* Custom scrollbar for dark theme */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #1e1e1e; 
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #444; 
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #555; 
+        }
+
+        /* Range slider styling */
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 100%;
+            background: transparent;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 16px;
+            width: 16px;
+            border-radius: 50%;
+            background: #3b82f6;
+            cursor: pointer;
+            margin-top: -6px;
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 4px;
+            cursor: pointer;
+            background: #4b5563;
+            border-radius: 2px;
+        }
+
+        /* Canvas Wrapper to keep scale */
+        .canvas-container-wrapper {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: auto;
+            background-color: #0a0a0a;
+            background-image: linear-gradient(45deg, #1a1a1a 25%, transparent 25%, transparent 75%, #1a1a1a 75%, #1a1a1a), 
+                              linear-gradient(45deg, #1a1a1a 25%, transparent 25%, transparent 75%, #1a1a1a 75%, #1a1a1a);
+            background-size: 20px 20px;
+            background-position: 0 0, 10px 10px;
+        }
+        
+        /* Modal Background */
+        .modal-bg {
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(4px);
+        }
+    </style>
+</head>
+<body class="flex h-screen antialiased selection:bg-blue-500 selection:text-white">
+
+    <!-- Left Sidebar: Generation Tools -->
+    <aside class="w-80 bg-gray-900 border-r border-gray-800 flex flex-col z-10 shrink-0">
+        <div class="p-5 border-b border-gray-800">
+            <h1 class="text-xl font-bold text-white flex items-center gap-2">
+                <i class="fa-solid fa-mountain-sun text-blue-500"></i> StockScape
+            </h1>
+            <p class="text-xs text-gray-400 mt-1">AI Landscape Generator untuk Microstock</p>
+        </div>
+
+        <div class="p-5 flex-1 overflow-y-auto">
+            <div class="mb-5 pb-5 border-b border-gray-800">
+                <label class="block text-sm font-medium text-gray-300 mb-2">Gemini API Key</label>
+                <div class="flex gap-2">
+                    <input type="password" id="apiKeyInput" class="w-full bg-gray-800 border border-gray-700 rounded-lg p-3 text-sm text-white focus:ring-2 focus:ring-blue-500 outline-none transition-all" placeholder="Masukkan API Key...">
+                    <button id="saveApiKeyBtn" class="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded-lg transition-colors flex items-center justify-center" title="Simpan API Key">
+                        <i class="fa-solid fa-save"></i>
+                    </button>
+                </div>
+                <p class="text-[10px] text-gray-500 mt-2">Kunci disimpan aman secara lokal di browser Anda.</p>
+            </div>
+
+            <label class="block text-sm font-medium text-gray-300 mb-2">Deskripsi Landscape</label>
+            <textarea id="promptInput" rows="4" class="w-full bg-gray-800 border border-gray-700 rounded-lg p-3 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all resize-none" placeholder="Contoh: Pegunungan alpen saat matahari terbit dengan danau jernih, hyper-realistic, pencahayaan dramatis..."></textarea>
+            
+            <label class="block text-sm font-medium text-gray-300 mt-4 mb-2">Rasio Aspek</label>
+            <select id="aspectRatio" class="w-full bg-gray-800 border border-gray-700 rounded-lg p-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+                <option value="16:9">16:9 (Lanskap Lebar)</option>
+                <option value="4:3">4:3 (Lanskap Standar)</option>
+                <option value="1:1">1:1 (Persegi)</option>
+                <option value="3:4">3:4 (Potret Standar)</option>
+                <option value="9:16">9:16 (Potret Panjang)</option>
+            </select>
+
+            <button id="generateBtn" class="w-full mt-6 bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 rounded-lg transition-colors flex justify-center items-center gap-2 shadow-lg shadow-blue-500/20">
+                <i class="fa-solid fa-wand-magic-sparkles"></i> Generate Gambar
+            </button>
+            
+            <div id="genStatus" class="mt-4 text-xs text-gray-400 hidden text-center">
+                <i class="fa-solid fa-circle-notch fa-spin mr-1"></i> Sedang membuat mahakarya...
+            </div>
+            
+            <div class="mt-8 pt-6 border-t border-gray-800">
+                <h3 class="text-sm font-semibold mb-3 flex items-center gap-2">
+                    <i class="fa-solid fa-layer-group"></i> Lapisan (Layers)
+                </h3>
+                <div id="layerList" class="bg-gray-800 rounded-lg p-2 min-h-[100px] text-xs text-gray-500 flex items-center justify-center border border-gray-700">
+                    Belum ada objek
+                </div>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Main Editor Area -->
+    <main class="flex-1 relative flex flex-col">
+        <!-- Top toolbar -->
+        <div class="h-14 bg-gray-900 border-b border-gray-800 flex items-center justify-between px-4 z-10">
+            <div class="flex gap-2">
+                <button id="deleteObjBtn" class="p-2 text-gray-400 hover:text-red-400 hover:bg-gray-800 rounded transition-colors" title="Hapus Objek Aktif">
+                    <i class="fa-solid fa-trash-can"></i>
+                </button>
+                <button id="centerObjBtn" class="p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded transition-colors" title="Tengahkan Objek">
+                    <i class="fa-solid fa-compress"></i>
+                </button>
+            </div>
+            <div class="text-xs text-gray-500">
+                Kanvas Dasar: <span class="font-mono text-gray-300">2560 x 1440</span> (Resolusi ekspor dapat diatur hingga 8K)
+            </div>
+        </div>
+        
+        <!-- Canvas Container -->
+        <div class="canvas-container-wrapper relative" id="canvasWrapper">
+            <canvas id="mainCanvas"></canvas>
+            
+            <!-- Loading Overlay for Canvas -->
+            <div id="canvasOverlay" class="absolute inset-0 bg-gray-900/80 backdrop-blur-sm flex flex-col items-center justify-center z-20 hidden">
+                <div class="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+                <p class="text-white font-medium" id="overlayText">Memproses Gambar...</p>
+            </div>
+        </div>
+    </main>
+
+    <!-- Right Sidebar: Properties & Export -->
+    <aside class="w-80 bg-gray-900 border-l border-gray-800 flex flex-col z-10 shrink-0">
+        <div class="p-5 overflow-y-auto flex-1">
+            
+            <div class="mb-6">
+                <h3 class="text-sm font-semibold mb-4 flex items-center gap-2 border-b border-gray-800 pb-2">
+                    <i class="fa-solid fa-sliders"></i> Komposisi Warna
+                </h3>
+                
+                <div class="space-y-4">
+                    <div>
+                        <div class="flex justify-between text-xs mb-1">
+                            <label class="text-gray-300">Kecerahan (Brightness)</label>
+                            <span id="brightVal">0</span>
+                        </div>
+                        <input type="range" id="brightness" min="-1" max="1" step="0.05" value="0">
+                    </div>
+                    
+                    <div>
+                        <div class="flex justify-between text-xs mb-1">
+                            <label class="text-gray-300">Kontras (Contrast)</label>
+                            <span id="contrastVal">0</span>
+                        </div>
+                        <input type="range" id="contrast" min="-1" max="1" step="0.05" value="0">
+                    </div>
+                    
+                    <div>
+                        <div class="flex justify-between text-xs mb-1">
+                            <label class="text-gray-300">Saturasi (Saturation)</label>
+                            <span id="satVal">0</span>
+                        </div>
+                        <input type="range" id="saturation" min="-1" max="1" step="0.05" value="0">
+                    </div>
+
+                    <div>
+                        <div class="flex justify-between text-xs mb-1">
+                            <label class="text-gray-300">Rona (Hue)</label>
+                            <span id="hueVal">0</span>
+                        </div>
+                        <input type="range" id="hue" min="-1" max="1" step="0.05" value="0">
+                    </div>
+                    
+                    <button id="resetColorBtn" class="w-full mt-2 bg-gray-800 hover:bg-gray-700 text-xs text-white py-2 rounded transition-colors">
+                        Reset Warna
+                    </button>
+                </div>
+            </div>
+
+            <div class="mb-6">
+                <h3 class="text-sm font-semibold mb-3 flex items-center gap-2 border-b border-gray-800 pb-2">
+                    <i class="fa-solid fa-tags"></i> Metadata Stok
+                </h3>
+                
+                <div class="space-y-3">
+                    <div>
+                        <label class="block text-xs text-gray-400 mb-1">Judul (Title)</label>
+                        <textarea id="metaTitle" rows="2" class="w-full bg-gray-800 border border-gray-700 rounded p-2 text-xs text-white focus:ring-1 focus:ring-blue-500 outline-none" placeholder="Otomatis diisi saat generate"></textarea>
+                    </div>
+                    <div>
+                        <div class="flex justify-between items-end mb-1">
+                            <label class="block text-xs text-gray-400">Kata Kunci (Keywords)</label>
+                            <button id="copyKeywords" class="text-[10px] text-blue-400 hover:text-blue-300"><i class="fa-regular fa-copy"></i> Salin</button>
+                        </div>
+                        <textarea id="metaKeywords" rows="4" class="w-full bg-gray-800 border border-gray-700 rounded p-2 text-xs text-white focus:ring-1 focus:ring-blue-500 outline-none" placeholder="Otomatis diisi saat generate"></textarea>
+                        <p class="text-[10px] text-gray-500 mt-1">Gunakan teks ini untuk upload ke Adobe Stock / Shutterstock.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div>
+                <h3 class="text-sm font-semibold mb-3 flex items-center gap-2 border-b border-gray-800 pb-2">
+                    <i class="fa-solid fa-download"></i> Ekspor & Resolusi
+                </h3>
+                
+                <div class="space-y-3">
+                    <div>
+                        <label class="block text-xs text-gray-400 mb-1">Kualitas Resolusi</label>
+                        <select id="exportRes" class="w-full bg-gray-800 border border-gray-700 rounded p-2 text-xs text-white outline-none">
+                            <option value="1">Standar (2560x1440 - ~3.6MP)</option>
+                            <option value="1.5">Adobe Stock Min (3840x2160 - 4K / ~8MP)</option>
+                            <option value="2">Super High (5120x2880 - 5K / ~14MP)</option>
+                            <option value="3">8K Ultra HD (7680x4320 - ~33MP)</option>
+                        </select>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-2 mt-4">
+                        <button onclick="exportImage('jpeg')" class="bg-blue-900/50 hover:bg-blue-800 text-blue-200 border border-blue-800 text-xs py-2 rounded transition-colors">
+                            <i class="fa-solid fa-file-image"></i> JPEG
+                        </button>
+                        <button onclick="exportImage('png')" class="bg-green-900/50 hover:bg-green-800 text-green-200 border border-green-800 text-xs py-2 rounded transition-colors">
+                            <i class="fa-solid fa-file-image"></i> PNG
+                        </button>
+                        <button onclick="exportImage('svg')" class="bg-orange-900/50 hover:bg-orange-800 text-orange-200 border border-orange-800 text-xs py-2 rounded transition-colors">
+                            <i class="fa-solid fa-bezier-curve"></i> SVG
+                        </button>
+                        <button onclick="exportImage('eps')" class="bg-purple-900/50 hover:bg-purple-800 text-purple-200 border border-purple-800 text-xs py-2 rounded transition-colors" title="Simpan sebagai SVG yang siap diconvert ke EPS">
+                            <i class="fa-solid fa-file-vector"></i> EPS*
+                        </button>
+                    </div>
+                    <p class="text-[10px] text-gray-500 mt-2">*Note: Browser murni tidak dapat merender true-EPS dari raster. Format EPS akan disave sebagai berkas vektor kompatibel (SVG) atau gunakan resolusi 8K JPEG untuk syarat Adobe Stock Photo/Illustration.</p>
+                </div>
+            </div>
+            
+        </div>
+    </aside>
+
+    <!-- Modal Message Box -->
+    <div id="messageBox" class="fixed inset-0 modal-bg z-50 flex items-center justify-center hidden opacity-0 transition-opacity duration-300">
+        <div class="bg-gray-800 border border-gray-700 rounded-xl shadow-2xl max-w-sm w-full mx-4 transform scale-95 transition-transform duration-300" id="messageBoxContent">
+            <div class="p-5 border-b border-gray-700 flex justify-between items-center">
+                <h3 class="text-lg font-bold text-white" id="messageTitle">Pesan</h3>
+                <button onclick="closeMessage()" class="text-gray-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="p-5 text-sm text-gray-300" id="messageBody">
+                Pesan disini
+            </div>
+            <div class="p-4 border-t border-gray-700 flex justify-end">
+                <button onclick="closeMessage()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm transition-colors">Tutup</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Fabric.js Global Variables
+        let canvas;
+        const BASE_WIDTH = 2560; // Base rendering width (high enough for good preview)
+        const BASE_HEIGHT = 1440; // Base rendering height (16:9)
+
+        // Initialize Fabric.js
+        function initCanvas() {
+            canvas = new fabric.Canvas('mainCanvas', {
+                preserveObjectStacking: true,
+                backgroundColor: '#ffffff'
+            });
+
+            // Set actual internal dimensions
+            canvas.setWidth(BASE_WIDTH);
+            canvas.setHeight(BASE_HEIGHT);
+
+            // Scale visually to fit container
+            resizeCanvasVisuals();
+            window.addEventListener('resize', resizeCanvasVisuals);
+
+            // Event Listeners for object selection (to enable filters)
+            canvas.on('selection:created', updateLayersPanel);
+            canvas.on('selection:updated', updateLayersPanel);
+            canvas.on('selection:cleared', updateLayersPanel);
+            canvas.on('object:added', updateLayersPanel);
+            canvas.on('object:removed', updateLayersPanel);
+        }
+
+        // Scale the canvas wrapper using CSS transform to fit the screen
+        function resizeCanvasVisuals() {
+            const wrapper = document.getElementById('canvasWrapper');
+            const w = wrapper.clientWidth - 40; // 40px padding
+            const h = wrapper.clientHeight - 40;
+            
+            // Calculate scale ratio to fit internal canvas inside viewport
+            const scaleX = w / BASE_WIDTH;
+            const scaleY = h / BASE_HEIGHT;
+            const scale = Math.min(scaleX, scaleY);
+            
+            // Apply CSS transform to the canvas wrapper created by Fabric (.canvas-container)
+            const fabricContainer = document.querySelector('.canvas-container');
+            if (fabricContainer) {
+                fabricContainer.style.transform = `scale(${scale})`;
+                fabricContainer.style.transformOrigin = 'center center';
+            }
+        }
+
+        // UI Helpers
+        function showMessage(title, text) {
+            document.getElementById('messageTitle').textContent = title;
+            document.getElementById('messageBody').textContent = text;
+            const box = document.getElementById('messageBox');
+            const content = document.getElementById('messageBoxContent');
+            box.classList.remove('hidden');
+            // small delay for transition
+            setTimeout(() => {
+                box.classList.remove('opacity-0');
+                content.classList.remove('scale-95');
+            }, 10);
+        }
+
+        function closeMessage() {
+            const box = document.getElementById('messageBox');
+            const content = document.getElementById('messageBoxContent');
+            box.classList.add('opacity-0');
+            content.classList.add('scale-95');
+            setTimeout(() => {
+                box.classList.add('hidden');
+            }, 300);
+        }
+
+        function toggleOverlay(show, text = 'Memproses Gambar...') {
+            const overlay = document.getElementById('canvasOverlay');
+            document.getElementById('overlayText').textContent = text;
+            if (show) overlay.classList.remove('hidden');
+            else overlay.classList.add('hidden');
+        }
+
+        function setGenerating(isGen) {
+            const btn = document.getElementById('generateBtn');
+            const status = document.getElementById('genStatus');
+            if (isGen) {
+                btn.disabled = true;
+                btn.classList.add('opacity-50', 'cursor-not-allowed');
+                status.classList.remove('hidden');
+                toggleOverlay(true, 'AI sedang melukis mahakarya...');
+            } else {
+                btn.disabled = false;
+                btn.classList.remove('opacity-50', 'cursor-not-allowed');
+                status.classList.add('hidden');
+                toggleOverlay(false);
+            }
+        }
+
+        async function generateImage() {
+            const prompt = document.getElementById('promptInput').value.trim();
+            const aspectRatio = document.getElementById('aspectRatio').value;
+            const apiKey = document.getElementById('apiKeyInput').value.trim();
+            
+            if (!apiKey) {
+                showMessage("Peringatan", "Mohon masukkan Gemini API Key Anda di panel sebelah kiri terlebih dahulu.");
+                return;
+            }
+
+            if (!prompt) {
+                showMessage("Peringatan", "Mohon masukkan deskripsi landscape terlebih dahulu.");
+                return;
+            }
+
+            setGenerating(true);
+
+            // Enhance prompt for stock photography
+            const enhancedPrompt = `Breathtaking nature landscape, highly detailed, masterclass photography, 8k resolution, suitable for stock photo. ${prompt}`;
+
+            const payload = {
+                contents: [{
+                    role: 'user',
+                    parts: [{ text: enhancedPrompt }]
+                }],
+                generationConfig: {
+                    responseModalities: ['IMAGE'],
+                    imageConfig: { aspectRatio: aspectRatio }
+                },
+            };
+
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image:generateContent?key=${apiKey}`;
+
+            try {
+                // Call Gemini for Image
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                const result = await response.json();
+                
+                if (result.error) {
+                    throw new Error(result.error.message);
+                }
+
+                const part = result?.candidates?.[0]?.content?.parts?.find(p => p.inlineData);
+                
+                if (part && part.inlineData) {
+                    const mimeType = part.inlineData.mimeType;
+                    const base64Data = part.inlineData.data;
+                    const imageUrl = `data:${mimeType};base64,${base64Data}`;
+                    
+                    loadImageToCanvas(imageUrl);
+                    
+                    // Fire off metadata generation concurrently
+                    generateMetadata(prompt);
+                    
+                } else {
+                    throw new Error("Format respons API tidak sesuai atau gambar diblokir oleh filter keamanan.");
+                }
+
+            } catch (error) {
+                console.error("Image Gen Error:", error);
+                showMessage("Error", "Gagal membuat gambar. Pastikan kuota API tersedia atau coba deskripsi lain. Detail: " + error.message);
+                setGenerating(false);
+            }
+        }
+
+        function loadImageToCanvas(dataUrl) {
+            fabric.Image.fromURL(dataUrl, (img) => {
+                // Resize internal canvas based on chosen aspect ratio to fit the new image shape
+                const ratio = document.getElementById('aspectRatio').value.split(':');
+                const wRatio = parseInt(ratio[0]);
+                const hRatio = parseInt(ratio[1]);
+                
+                // Keep max dimension to BASE_WIDTH roughly
+                let newWidth, newHeight;
+                if (wRatio > hRatio) {
+                    newWidth = BASE_WIDTH;
+                    newHeight = (BASE_WIDTH / wRatio) * hRatio;
+                } else {
+                    newHeight = BASE_WIDTH;
+                    newWidth = (BASE_WIDTH / hRatio) * wRatio;
+                }
+                
+                canvas.setWidth(newWidth);
+                canvas.setHeight(newHeight);
+                resizeCanvasVisuals(); // Update CSS scale
+
+                // Scale image to fill canvas
+                img.set({
+                    left: 0,
+                    top: 0
+                });
+                img.scaleToWidth(newWidth);
+                if (img.getScaledHeight() < newHeight) {
+                    img.scaleToHeight(newHeight);
+                }
+                
+                // Clear previous and add new
+                canvas.clear();
+                canvas.backgroundColor = '#ffffff';
+                canvas.add(img);
+                canvas.centerObject(img);
+                canvas.setActiveObject(img);
+                
+                // Initialize filters for the new image
+                initFilters(img);
+                
+                setGenerating(false);
+            });
+        }
+
+        async function generateMetadata(prompt) {
+            const apiKey = document.getElementById('apiKeyInput').value.trim();
+            if (!apiKey) return; // Silent return as warning is handled in generateImage
+
+            const systemPrompt = "Anda adalah ahli SEO untuk platform microstock (Shutterstock, Adobe Stock). Tugas Anda membuat judul dan kata kunci berkinerja tinggi dalam bahasa Inggris. Kembalikan data murni dalam format JSON: { \"title\": \"Judul max 200 karakter\", \"keywords\": [\"keyword1\", \"keyword2\", ...maksimal 40] }. Jangan tambahkan markdown block atau teks lain.";
+            const userPrompt = `Buatkan metadata untuk gambar stok pemandangan ini: ${prompt}`;
+
+            const payload = {
+                contents: [{ parts: [{ text: userPrompt }] }],
+                systemInstruction: { parts: [{ text: systemPrompt }] },
+                generationConfig: { responseMimeType: "application/json" }
+            };
+
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`;
+
+            try {
+                document.getElementById('metaTitle').value = "Menghasilkan metadata...";
+                document.getElementById('metaKeywords').value = "Menghasilkan kata kunci...";
+
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                
+                const result = await response.json();
+                const jsonText = result?.candidates?.[0]?.content?.parts?.[0]?.text;
+                
+                if (jsonText) {
+                    const metadata = JSON.parse(jsonText);
+                    document.getElementById('metaTitle').value = metadata.title;
+                    document.getElementById('metaKeywords').value = metadata.keywords.join(", ");
+                }
+            } catch (error) {
+                console.error("Metadata Gen Error:", error);
+                document.getElementById('metaTitle').value = "Gagal menghasilkan judul otomatis.";
+                document.getElementById('metaKeywords').value = "Gagal menghasilkan kata kunci otomatis.";
+            }
+        }
+
+        const sliders = {
+            brightness: document.getElementById('brightness'),
+            contrast: document.getElementById('contrast'),
+            saturation: document.getElementById('saturation'),
+            hue: document.getElementById('hue')
+        };
+        const vals = {
+            brightness: document.getElementById('brightVal'),
+            contrast: document.getElementById('contrastVal'),
+            saturation: document.getElementById('satVal'),
+            hue: document.getElementById('hueVal')
+        };
+
+        function initFilters(img) {
+            // Add empty filters to the image
+            img.filters = [
+                new fabric.Image.filters.Brightness({ brightness: 0 }),
+                new fabric.Image.filters.Contrast({ contrast: 0 }),
+                new fabric.Image.filters.Saturation({ saturation: 0 }),
+                new fabric.Image.filters.HueRotation({ rotation: 0 })
+            ];
+            img.applyFilters();
+            canvas.renderAll();
+            
+            // Reset sliders
+            Object.values(sliders).forEach(s => s.value = 0);
+            Object.values(vals).forEach(v => v.textContent = "0");
+        }
+
+        function applyFilterValues() {
+            const activeObj = canvas.getActiveObject();
+            // Ensure it's an image
+            if (!activeObj || !activeObj.filters) return;
+
+            // Fabric filter index matches initialization order
+            activeObj.filters[0].brightness = parseFloat(sliders.brightness.value);
+            activeObj.filters[1].contrast = parseFloat(sliders.contrast.value);
+            activeObj.filters[2].saturation = parseFloat(sliders.saturation.value);
+            activeObj.filters[3].rotation = parseFloat(sliders.hue.value);
+            
+            activeObj.applyFilters();
+            canvas.renderAll();
+        }
+
+        // Attach listeners to sliders
+        Object.keys(sliders).forEach(key => {
+            sliders[key].addEventListener('input', (e) => {
+                vals[key].textContent = e.target.value;
+                applyFilterValues();
+            });
+        });
+
+        document.getElementById('resetColorBtn').addEventListener('click', () => {
+            Object.values(sliders).forEach(s => s.value = 0);
+            Object.values(vals).forEach(v => v.textContent = "0");
+            applyFilterValues();
+        });
+
+        function updateLayersPanel() {
+            const panel = document.getElementById('layerList');
+            const objects = canvas.getObjects();
+            
+            if (objects.length === 0) {
+                panel.innerHTML = 'Belum ada objek';
+                return;
+            }
+
+            panel.innerHTML = '';
+            // Display top object first
+            for (let i = objects.length - 1; i >= 0; i--) {
+                const obj = objects[i];
+                const isActive = canvas.getActiveObject() === obj;
+                
+                const div = document.createElement('div');
+                div.className = `p-2 rounded mb-1 cursor-pointer flex items-center justify-between transition-colors ${isActive ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'}`;
+                
+                const name = obj.type === 'image' ? 'Gambar Lanskap' : 'Objek';
+                div.innerHTML = `
+                    <span><i class="fa-regular fa-image mr-2"></i> ${name} ${i+1}</span>
+                    <i class="fa-solid fa-layer-group text-opacity-50"></i>
+                `;
+                
+                div.onclick = () => {
+                    canvas.setActiveObject(obj);
+                    canvas.renderAll();
+                };
+                
+                panel.appendChild(div);
+            }
+        }
+
+        // Toolbar Buttons
+        document.getElementById('deleteObjBtn').addEventListener('click', () => {
+            const activeObj = canvas.getActiveObject();
+            if (activeObj) {
+                canvas.remove(activeObj);
+            }
+        });
+
+        document.getElementById('centerObjBtn').addEventListener('click', () => {
+            const activeObj = canvas.getActiveObject();
+            if (activeObj) {
+                canvas.centerObject(activeObj);
+                activeObj.setCoords(); // update controls
+                canvas.renderAll();
+            }
+        });
+
+        function exportImage(format) {
+            const objects = canvas.getObjects();
+            if (objects.length === 0) {
+                showMessage("Kosong", "Tidak ada gambar di kanvas untuk diekspor.");
+                return;
+            }
+
+            // Deselect to remove control boxes from export
+            canvas.discardActiveObject();
+            canvas.renderAll();
+
+            const multiplier = parseFloat(document.getElementById('exportRes').value);
+            
+            if (format === 'svg' || format === 'eps') {
+                // Vector Export
+                try {
+                    const svgData = canvas.toSVG();
+                    const blob = new Blob([svgData], {type: "image/svg+xml;charset=utf-8"});
+                    const url = URL.createObjectURL(blob);
+                    
+                    const link = document.createElement('a');
+                    link.href = url;
+                    // If they wanted EPS, we save as SVG and remind them.
+                    const ext = format === 'eps' ? 'svg' : 'svg';
+                    const prefix = format === 'eps' ? 'eps_compatible_' : '';
+                    link.download = `${prefix}landscape_export.${ext}`;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    
+                    if(format === 'eps') {
+                        setTimeout(() => {
+                            showMessage("Informasi Ekspor EPS", "Berkas telah diunduh sebagai SVG resolusi tinggi. Untuk mengunggah sebagai vektor EPS ke Adobe Stock, buka SVG ini di Adobe Illustrator dan Save As -> EPS (Illustrator 10 atau CC). Karena keterbatasan browser, konversi raster murni ke vektor EPS membutuhkan software eksternal.");
+                        }, 500);
+                    }
+                } catch (e) {
+                    showMessage("Error Ekspor", "Gagal mengekspor vektor: " + e.message);
+                }
+            } else {
+                // Raster Export (JPEG / PNG)
+                // We handle large exports carefully to avoid browser crashes.
+                toggleOverlay(true, 'Menyusun render resolusi tinggi...');
+                
+                setTimeout(() => {
+                    try {
+                        const dataUrl = canvas.toDataURL({
+                            format: format === 'jpeg' ? 'jpeg' : 'png',
+                            quality: 1.0, // max quality
+                            multiplier: multiplier
+                        });
+
+                        const link = document.createElement('a');
+                        link.href = dataUrl;
+                        link.download = `stockscape_${new Date().getTime()}.${format}`;
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                    } catch (e) {
+                        showMessage("Error Ekspor", "Gagal mengekspor gambar. Jika menggunakan resolusi 8K, memori perangkat mungkin tidak cukup. Coba turunkan resolusi. Detail: " + e.message);
+                    } finally {
+                        toggleOverlay(false);
+                    }
+                }, 100); // Small timeout to let UI update overlay
+            }
+        }
+
+        // Copy Keywords Utility
+        document.getElementById('copyKeywords').addEventListener('click', () => {
+            const text = document.getElementById('metaKeywords').value;
+            if(!text) return;
+            
+            // execCommand as required by instruction constraints for iFrames
+            const textarea = document.createElement('textarea');
+            textarea.value = text;
+            document.body.appendChild(textarea);
+            textarea.select();
+            try {
+                document.execCommand('copy');
+                const btn = document.getElementById('copyKeywords');
+                const origHtml = btn.innerHTML;
+                btn.innerHTML = '<i class="fa-solid fa-check text-green-400"></i> Tersalin';
+                setTimeout(() => btn.innerHTML = origHtml, 2000);
+            } catch (err) {
+                console.error('Copy failed', err);
+            }
+            document.body.removeChild(textarea);
+        });
+
+        // Bind main generate button
+        document.getElementById('generateBtn').addEventListener('click', generateImage);
+
+        // Initialize on load
+        window.onload = () => {
+            initCanvas();
+
+            // Load saved API Key from localStorage
+            const savedKey = localStorage.getItem('gemini_api_key');
+            if (savedKey) {
+                document.getElementById('apiKeyInput').value = savedKey;
+            }
+
+            // Bind save API Key button
+            document.getElementById('saveApiKeyBtn').addEventListener('click', () => {
+                const key = document.getElementById('apiKeyInput').value.trim();
+                if (key) {
+                    localStorage.setItem('gemini_api_key', key);
+                    showMessage("Berhasil", "API Key telah disimpan di memori lokal browser Anda.");
+                } else {
+                    localStorage.removeItem('gemini_api_key');
+                    showMessage("Info", "API Key telah dihapus dari memori lokal browser.");
+                }
+            });
+        };
+    </script>
+</body>
+</html>
